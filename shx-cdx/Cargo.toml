@@ -1,0 +1,24 @@
+[package]
+name = "shx-cdx"
+version = "0.0.1"
+edition = "2021"
+homepage = "https://github.com/cjlee38/shx"
+repository = "https://github.com/cjlee38/shx"
+description = "Cd with history"
+license = "Apache-2.0"
+include = [
+    "**/*.rs",
+    "Cargo.*",
+    "*.md",
+]
+
+[dependencies]
+console = "0.15.8"
+clap = { version = "4", features = ["cargo", "wrap_help", "derive"] }
+shx-config = { path = "../shx-config" }
+anyhow = "1.0.93"
+
+[[bin]]
+name = "cdx"
+path = "src/main.rs"
+readme = "../README.md"

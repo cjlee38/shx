@@ -1,21 +1,57 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use serde::Deserialize;
 
-// TODO : Implement Config when needed.
-pub struct Config {}
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    #[serde(default)]
+    cdx_config: CdxConfig,
+}
 
-pub fn config() {
-    println!("config");
-    if let Some(home) = shx_home() {
-        let buf = home.join("config.toml");
-        if buf.exists() {
-            println!("{:?} config exists", buf);
-        } else {
-            println!("{:?} config not exists", buf);
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            cdx_config: CdxConfig::default(),
         }
     }
 }
 
-pub fn path_for(name: &str) -> Option<PathBuf> {
+#[derive(Debug, Deserialize)]
+pub struct CdxConfig {
+    pub search_size: usize,
+    pub max_size: usize,
+}
+
+impl Default for CdxConfig {
+    fn default() -> Self {
+        CdxConfig {
+            search_size: 30,
+            max_size: 1024,
+        }
+    }
+}
+
+pub fn config() -> Option<Config> {
+    if let Some(home) = shx_home() {
+        let buf = home.join("config.toml");
+        if buf.exists() {
+            let content = std::fs::read_to_string(buf).ok();
+            if content.is_none() {
+                return Some(Config::default());
+            }
+            let content = content.unwrap();
+            if content.is_empty() {
+                return Some(Config::default());
+            }
+            return toml::from_str::<Config>(&content).ok();
+        }
+    }
+    None
+}
+
+pub fn path_for<P>(name: P) -> Option<PathBuf>
+where
+    P: AsRef<Path>,
+{
     if let Some(shx_home) = shx_home() {
         return Some(shx_home.join(name));
     }

@@ -19,6 +19,6 @@ shx-config = { path = "../shx-config" }
 anyhow = "1.0.93"
 
 [[bin]]
-name = "cdx"
+name = "shx-cdx"
 path = "src/main.rs"
 readme = "../README.md"

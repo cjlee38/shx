@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Context};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -31,67 +32,67 @@ impl Default for CdxConfig {
     }
 }
 
-pub fn config() -> Option<Config> {
-    if let Some(home) = shx_home() {
-        let buf = home.join("config.toml");
-        if buf.exists() {
-            let content = std::fs::read_to_string(buf).ok();
-            if content.is_none() {
-                return Some(Config::default());
-            }
-            let content = content.unwrap();
-            if content.is_empty() {
-                return Some(Config::default());
-            }
-            return toml::from_str::<Config>(&content).ok();
+// TODO : initialize config file
+pub fn config() -> anyhow::Result<Config> {
+    let home = shx_home()?;
+    let buf = home.join("config.toml");
+    if buf.exists() {
+        let content = std::fs::read_to_string(buf).ok();
+        if content.is_none() {
+            return Ok(Config::default());
         }
+        let content = content.unwrap();
+        if content.is_empty() {
+            return Ok(Config::default());
+        }
+        return toml::from_str::<Config>(&content).context("[fatal] failed to parse config file");
     }
-    None
+    Err(anyhow!("Cannot find config file"))
 }
 
-pub fn path_for<P>(name: P) -> Option<PathBuf>
+pub fn path_for<P>(name: P) -> anyhow::Result<PathBuf>
 where
     P: AsRef<Path>,
 {
-    if let Some(shx_home) = shx_home() {
-        return Some(shx_home.join(name));
+    if let Ok(shx_home) = shx_home() {
+        return Ok(shx_home.join(name));
     }
-    None
+    Err(anyhow!("Cannot find path for directory {}", name.as_ref().display()))
 }
 
-fn shx_home() -> Option<PathBuf> {
+fn shx_home() -> anyhow::Result<PathBuf> {
     if let Ok(shx_home) = std::env::var("SHX_HOME") {
-        return Some(PathBuf::from(shx_home));
+        return Ok(PathBuf::from(shx_home));
     }
-    if let Some(home) = home() {
-        return Some(PathBuf::from(home).join(".shx"));
+    if let Ok(home) = home() {
+        return Ok(PathBuf::from(home).join(".shx"));
     }
-    None
+    Err(anyhow!("Cannot find shx home directory"))
 }
 
-fn home() -> Option<PathBuf> {
+pub fn home() -> anyhow::Result<PathBuf> {
     if let Ok(home) = std::env::var("HOME") {
         if !home.is_empty() {
-            return Some(PathBuf::from(home));
+            return Ok(PathBuf::from(home));
         }
     }
 
     #[cfg(target_family = "windows")]
     if let Ok(profile) = std::env::var("USERPROFILE") {
-        return Some(PathBuf::from(profile));
+        return Ok(PathBuf::from(profile));
     }
 
     if let Some(user) = get_current_username() {
         #[cfg(target_family = "unix")]
         {
-            return Some(PathBuf::from(format!("/home/{}", user)));
+            return Ok(PathBuf::from(format!("/home/{}", user)));
         }
         #[cfg(target_family = "windows")]
         {
             return Some(PathBuf::from(format!("C:\\Users\\{}", user)));
         }
     }
-    None
+    Err(anyhow!("Cannot find home directory"))
 }
 
 fn get_current_username() -> Option<String> {

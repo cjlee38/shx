@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, BufWriter, Write};
-
+use std::path::PathBuf;
 use anyhow::Context;
 use shx_config::config::path_for;
 
@@ -76,5 +76,14 @@ impl CdxHistory {
         file.write_all(row.serialize().as_bytes())
             .context("failed to write to cd_history file")?;
         Ok(())
+    }
+
+    pub fn find_by_shortcut(&self, shortcut: PathBuf) -> Option<DirPath> {
+        self.0.iter()
+            .find(|row| {
+                DirPath::from_string(&row.canonical)
+                    .unwrap()
+                    .ends_with(&shortcut)
+            }).map(|row| DirPath::from_string(&row.canonical).unwrap())
     }
 }

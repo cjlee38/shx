@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    cdx_config: CdxConfig,
+    pub cdx_config: CdxConfig,
 }
 
 impl Default for Config {
@@ -17,15 +18,15 @@ impl Default for Config {
 
 #[derive(Debug, Deserialize)]
 pub struct CdxConfig {
-    pub search_size: usize,
-    pub max_size: usize,
+    pub search_size: Option<usize>,
+    pub max_size: Option<usize>,
 }
 
 impl Default for CdxConfig {
     fn default() -> Self {
         CdxConfig {
-            search_size: 30,
-            max_size: 1024,
+            search_size: Some(30),
+            max_size: Some(1024),
         }
     }
 }

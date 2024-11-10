@@ -3,10 +3,11 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context};
 
-pub struct DirPath(PathBuf);
+/// Represents a directory path, which must exist and be a directory.
+pub struct DirPath(pub PathBuf);
 
 impl DirPath {
-    pub fn from_string(path: String) -> anyhow::Result<Self> {
+    pub fn from_string(path: &String) -> anyhow::Result<Self> {
         Self::from_path(PathBuf::from(path))
     }
 
@@ -24,6 +25,10 @@ impl DirPath {
         let canonical = self.0.canonicalize()
             .context(format!("failed to canonicalize path {}", self.0.display()))?;
         return Ok(Self::from_path(canonical)?);
+    }
+
+    pub fn ends_with(&self, path_buf: &PathBuf) -> bool {
+        self.0.ends_with(&path_buf)
     }
 }
 

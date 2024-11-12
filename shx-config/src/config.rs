@@ -1,7 +1,9 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use serde::{Deserialize, Serialize};
+
 use crate::cdx::CdxConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,20 +22,33 @@ impl Default for Config {
 
 pub fn config() -> anyhow::Result<Config> {
     let home = shx_home()?;
-    let buf = home.join("config.toml");
-    if buf.exists() {
-        let content = std::fs::read_to_string(buf).ok();
+    let config_path = home.join("config.toml");
+    if config_path.exists() {
+        let content = fs::read_to_string(&config_path).ok();
         if content.is_none() {
-            return Ok(Config::default());
+            return fallback(config_path);
         }
         let content = content.unwrap();
         if content.is_empty() {
-            return Ok(Config::default());
+            return fallback(config_path);
         }
+        // TODO : detect which caused parsing error & tell user.
         return toml::from_str::<Config>(&content).context("[fatal] failed to parse config file");
     }
-    // TODO : initialize config file
-    bail!("Cannot find config file")
+    fallback(config_path)
+}
+
+/// Creates a default config file when missing
+fn fallback<P>(path: P) -> anyhow::Result<Config>
+where
+    P: AsRef<Path>,
+{
+    let config = Config::default();
+
+    toml::to_string(&config)
+        .map_err(|e| anyhow!("[fatal] failed to serialize config: {}", e))
+        .and_then(|serialized| fs::write(path, serialized).map_err(|e| anyhow!("[fatal] failed to write config: {}", e)))
+        .map(|_| config)
 }
 
 pub fn path_for<P>(name: P) -> anyhow::Result<PathBuf>
@@ -50,10 +65,14 @@ fn shx_home() -> anyhow::Result<PathBuf> {
     if let Ok(shx_home) = std::env::var("SHX_HOME") {
         return Ok(PathBuf::from(shx_home));
     }
-    if let Ok(home) = home() {
-        return Ok(PathBuf::from(home).join(".shx"));
+    let home = home()?;
+    let shx_home = PathBuf::from(home).join(".shx");
+    // ensure shx_home exists
+    if !shx_home.exists() {
+        fs::create_dir_all(&shx_home)
+            .context(format!("[fatal] failed to create $SHX_HOME {}", shx_home.display()))?;
     }
-    bail!("[error] Cannot find shx home directory")
+    Ok(shx_home)
 }
 
 pub fn home() -> anyhow::Result<PathBuf> {

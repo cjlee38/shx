@@ -75,7 +75,7 @@ fn cd_builtin(_config: &CdxConfig, history: &mut History, dest: String) -> anyho
             DirPath::from_path(home)?.canonicalize()
         }
         "-" => {
-            return cd_revision(_config, history, 1);
+            return cd_revision(_config, history, 2);
         }
         _ => DirPath::from_string(&dest)?.canonicalize(),
     }?;
@@ -88,7 +88,6 @@ fn cd_builtin(_config: &CdxConfig, history: &mut History, dest: String) -> anyho
 }
 
 fn cd_shortcut(config: &CdxConfig, history: &mut History, input: String) -> anyhow::Result<DirPath> {
-    // TODO : fuzzy find, but declarative.
     let dir = PathBuf::from(input.clone());
     let search_size = config.search_size();
 
@@ -103,13 +102,12 @@ fn cd_shortcut(config: &CdxConfig, history: &mut History, input: String) -> anyh
 }
 
 fn cd_revision(config: &CdxConfig, history: &mut History, revision: usize) -> anyhow::Result<DirPath> {
-    let revision = revision;
     let search_size = config.search_size();
     if revision <= 0 || revision > search_size {
         bail!("[error] revision {} is out of range. (0 < r <={})", revision, search_size);
     }
     let found = history.read(search_size)
-        .get(revision - 1) // input revision starts with 1
+        .get(revision) // input revision starts with 1
         .map(|entry| DirPath::from_string(&entry.canonical).unwrap())
         .ok_or(anyhow!("[error] failed to find history by revision {}", revision))?;
     let to_append = Entry::from_special(revision.to_string(), &found)?;

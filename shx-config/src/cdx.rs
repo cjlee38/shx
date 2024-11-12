@@ -16,11 +16,6 @@ impl CdxConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-enum ThemeStyle {
-    Plain,
-}
-
 impl Default for CdxConfig {
     fn default() -> Self {
         CdxConfig {

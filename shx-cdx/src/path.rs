@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 
 /// Represents a directory path, which must exist and be a directory.
 pub struct DirPath(pub PathBuf);
@@ -13,10 +13,10 @@ impl DirPath {
 
     pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         if !path.exists() {
-            return Err(anyhow!("Path {} does not exist", path.display()));
+            return bail!("Path {} does not exist", path.display());
         }
         if !path.is_dir() {
-            return Err(anyhow!("Path {} is not a directory", path.display()));
+            return bail!("Path {} is not a directory", path.display());
         }
         Ok(Self(path))
     }

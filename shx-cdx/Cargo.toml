@@ -13,10 +13,12 @@ include = [
 ]
 
 [dependencies]
-console = "0.15.8"
+dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
 clap = { version = "4", features = ["cargo", "wrap_help", "derive"] }
-shx-config = { path = "../shx-config" }
+bincode = "1.3.3"
 anyhow = "1.0.93"
+shx-config = { path = "../shx-config" }
+serde = { version = "1.0.214", features = ["derive"] }
 
 [[bin]]
 name = "shx-cdx"

@@ -1,21 +1,62 @@
-use std::fmt::Debug;
-use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::{fs, io};
+use std::fmt::{Debug, Display};
+use std::io::Write;
 
 use anyhow::Context;
+use bincode::Options;
+use serde::{Deserialize, Serialize};
 use shx_config::config::path_for;
 
 use crate::path::DirPath;
 
-/// Unit separator character for serialization.
-///
-/// This character is used to separate raw path and canonical path.
-const SEPARATOR: char = 0x1f as char;
+const DB: &str = "cdx.db";
 
+#[derive(Serialize, Deserialize)]
 pub struct History(Vec<Entry>);
 
-#[derive(Debug)]
+impl History {
+    pub fn open() -> anyhow::Result<Self> {
+        let path = path_for(DB)?;
+
+        return match fs::read(&path) {
+            Ok(bytes) => {
+                let deserializer = bincode::options();
+                let history = deserializer.deserialize(&bytes)?;
+                Ok(history)
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                Ok(History(Vec::new()))
+            }
+            Err(e) => {
+                Err(e).with_context(|| format!("[fatal] cannot not read from database: {}", path.display()))
+            }
+        };
+    }
+
+    pub fn read(&self, size: usize) -> Vec<&Entry> {
+        self.0.iter()
+            .rev()
+            .take(size)
+            .collect()
+    }
+
+    // if ever visited, promote to first. else append.
+    pub fn append_last(&mut self, new_entry: Entry) -> () {
+        self.0.retain(|it| &it.canonical != &new_entry.canonical);
+        self.0.push(new_entry);
+    }
+
+    pub fn save(&self) -> anyhow::Result<()> {
+        let path = path_for(DB)?;
+        let serializer = bincode::options();
+        let serialized = serializer.serialize(&self.0)?;
+        fs::write(&path, serialized)?;
+        Ok(())
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub raw: String,
     pub canonical: String,
@@ -25,7 +66,7 @@ impl Entry {
     pub fn from_special(raw: String, canonical: &DirPath) -> anyhow::Result<Self> {
         Ok(Entry {
             raw: format!("^{}", raw),
-            canonical: canonical.canonicalize()?.to_string()
+            canonical: canonical.canonicalize()?.to_string(),
         })
     }
 
@@ -34,83 +75,5 @@ impl Entry {
             raw: dir.to_string(),
             canonical: dir.canonicalize()?.to_string(),
         })
-    }
-}
-
-impl Entry {
-    fn serialize(&self) -> String {
-        let mut s = String::new();
-        s.push_str(self.raw.as_str());
-        s.push(SEPARATOR);
-        s.push_str(self.canonical.as_str());
-        s.push('\n');
-        return s;
-    }
-}
-
-impl History {
-    pub fn read(size: usize) -> anyhow::Result<Self> {
-        let path = path_for("cd_history")?;
-        let file = OpenOptions::new()
-            .read(true)
-            .open(path)?;
-        // This function can be improved in a efficient way, but left as it is for simplicity.
-        let reader = BufReader::new(&file);
-        let rows: Vec<Entry> = reader.lines()
-            .map(|line| {
-                let text = line.unwrap();
-                let s = text.split(SEPARATOR).collect::<Vec<&str>>();
-                let raw = s[0].to_string();
-                let canonical = s[1].to_string();
-
-                Entry { raw, canonical }
-            })
-            .collect::<Vec<Entry>>()
-            .into_iter()
-            .rev()
-            .take(size)
-            .collect();
-        Ok(History(rows))
-    }
-
-    pub fn append(&self, to_append: &Entry) -> anyhow::Result<()> {
-        if self.is_duplicated(to_append) {
-            return Ok(());
-        }
-
-        let path = path_for("cd_history").context("cd_history file not found")?;
-        let file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(path)
-            .context("failed to open cd_history file")?;
-        let mut file = BufWriter::new(file);
-        file.write_all(to_append.serialize().as_bytes())
-            .context("failed to write to cd_history file")?;
-        Ok(())
-    }
-
-    fn is_duplicated(&self, to_append: &Entry) -> bool {
-        self.0.get(0)
-            .map(|row| row.canonical == to_append.canonical)
-            .unwrap_or(false)
-    }
-
-    pub fn find_by_shortcut(&self, shortcut: PathBuf) -> Option<DirPath> {
-        self.0.iter()
-            .find(|row| {
-                DirPath::from_string(&row.canonical)
-                    .unwrap()
-                    .ends_with(&shortcut)
-            }).map(|row| DirPath::from_string(&row.canonical).unwrap())
-    }
-
-    pub fn find_by_revision(&self, revision: usize) -> Option<DirPath> {
-        self.0.get(revision)
-            .map(|row| DirPath::from_string(&row.canonical).unwrap())
-    }
-
-    pub fn entries(self) -> Vec<Entry> {
-        self.0
     }
 }

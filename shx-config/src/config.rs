@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::{bail, Context};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -19,8 +19,8 @@ impl Default for Config {
 
 #[derive(Debug, Deserialize)]
 pub struct CdxConfig {
-    pub search_size: Option<usize>,
-    pub max_size: Option<usize>,
+    search_size: Option<usize>,
+    max_size: Option<usize>,
 }
 
 impl Default for CdxConfig {
@@ -32,7 +32,16 @@ impl Default for CdxConfig {
     }
 }
 
-// TODO : initialize config file
+impl CdxConfig {
+    pub fn search_size(&self) -> usize {
+        self.search_size.unwrap_or(30)
+    }
+
+    pub fn max_size(&self) -> usize {
+        self.max_size.unwrap_or(1024)
+    }
+}
+
 pub fn config() -> anyhow::Result<Config> {
     let home = shx_home()?;
     let buf = home.join("config.toml");
@@ -47,7 +56,8 @@ pub fn config() -> anyhow::Result<Config> {
         }
         return toml::from_str::<Config>(&content).context("[fatal] failed to parse config file");
     }
-    Err(anyhow!("Cannot find config file"))
+    // TODO : initialize config file
+    bail!("Cannot find config file")
 }
 
 pub fn path_for<P>(name: P) -> anyhow::Result<PathBuf>
@@ -57,7 +67,7 @@ where
     if let Ok(shx_home) = shx_home() {
         return Ok(shx_home.join(name));
     }
-    Err(anyhow!("Cannot find path for directory {}", name.as_ref().display()))
+    bail!("[error] Cannot find directory from $SHX_HOME {}", name.as_ref().display())
 }
 
 fn shx_home() -> anyhow::Result<PathBuf> {
@@ -67,7 +77,7 @@ fn shx_home() -> anyhow::Result<PathBuf> {
     if let Ok(home) = home() {
         return Ok(PathBuf::from(home).join(".shx"));
     }
-    Err(anyhow!("Cannot find shx home directory"))
+    bail!("[error] Cannot find shx home directory")
 }
 
 pub fn home() -> anyhow::Result<PathBuf> {
@@ -92,7 +102,7 @@ pub fn home() -> anyhow::Result<PathBuf> {
             return Some(PathBuf::from(format!("C:\\Users\\{}", user)));
         }
     }
-    Err(anyhow!("Cannot find home directory"))
+    bail!("[fatal] Cannot find home directory")
 }
 
 fn get_current_username() -> Option<String> {

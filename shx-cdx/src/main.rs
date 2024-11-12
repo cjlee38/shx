@@ -1,113 +1,132 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, format};
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::{Args, Parser};
-use shx_config::config::{config, home};
+use dialoguer::FuzzySelect;
+use dialoguer::theme::ColorfulTheme;
+use shx_config::config::{CdxConfig, config, home};
 
 use crate::cli::{Cli, DirArgs};
+use crate::formatter::ToPretty;
 use crate::history::{Entry, History};
 use crate::path::DirPath;
 
 mod cli;
 mod history;
 mod path;
+mod formatter;
 
 fn main() -> ExitCode {
+    let exec = exec();
+    match exec {
+        Ok(it) => {
+            println!("{}", it);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            println!("{}", e);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn exec() -> anyhow::Result<String>
+{
     let cli = Cli::parse();
-    eprintln!("{:?}", cli); // TODO : temp
+    let mut history = History::open()?;
+    let config = config().unwrap().cdx_config;
 
     return if cli.show_history {
-        match show_history() {
-            Err(e) => {
-                eprintln!("{}", e);
-                ExitCode::FAILURE
-            }
-            Ok(_) => ExitCode::SUCCESS,
-        }
+        show_history(config, history)
     } else {
         let result = match cli.dir() {
-            DirArgs::BulitIn(s) => cd_builtin(s),
-            DirArgs::Shortcut(s) => cd_shortcut(s),
-            DirArgs::Revision(i) => cd_revision(i),
-            DirArgs::Interactive => cd_interactive(),
+            DirArgs::BulitIn(dest) => cd_builtin(&config, &mut history, dest),
+            DirArgs::Shortcut(shortcut) => cd_shortcut(&config, &mut history, shortcut),
+            DirArgs::Revision(revision) => cd_revision(&config, &mut history, revision),
+            DirArgs::Interactive => cd_interactive(&config, &mut history),
         };
 
-        match result {
-            Err(e) => {
-                eprintln!("{}", e);
-                ExitCode::FAILURE
-            }
-            Ok(dir) => {
-                println!("{}", dir);
-                ExitCode::SUCCESS
-            }
-        }
+        history.save()?;
+        result.map(|it| format!("{}", it))
     };
 }
 
-fn show_history() -> anyhow::Result<()> {
-    eprintln!("show history");
-    let config = config()?;
-    let search_size = config.cdx_config.search_size.ok_or(anyhow!("search_size is not set"))?;
-    let history = History::read(search_size)?;
-    history.entries()
-        .iter()
-        .for_each(|entry| {
-            println!("{}", entry.canonical);
-        });
-    Ok(())
+fn show_history(config: CdxConfig, history: History) -> anyhow::Result<String> {
+    let search_size = config.search_size();
+
+    let output = history.read(search_size)
+        .prettify()
+        .join("\n");
+    Ok(output)
 }
 
-fn cd_builtin(input: String) -> anyhow::Result<DirPath> {
-    let dir = match input.as_str() {
+fn cd_builtin(_config: &CdxConfig, history: &mut History, dest: String) -> anyhow::Result<DirPath> {
+    let dir = match dest.as_str() {
         "" => {
             let home = home()?;
-            DirPath::from_path(home)
+            DirPath::from_path(home)?.canonicalize()
         }
         "-" => {
-            todo!()
+            return cd_revision(_config, history, 1);
         }
-        _ => DirPath::from_string(&input),
+        _ => DirPath::from_string(&dest)?.canonicalize(),
     }?;
 
     let row = Entry::from_dir(&dir)
-        .context(format!("failed to create history row for {}", dir))?;
+        .context(format!("[error] failed to create history entry for {}", dir))?;
 
-    // read 1 for check if last row is same with input
-    History::read(1)?
-        .append(&row)?;
+    history.append_last(row);
     Ok(dir)
 }
 
-fn cd_shortcut(input: String) -> anyhow::Result<DirPath> {
+fn cd_shortcut(config: &CdxConfig, history: &mut History, input: String) -> anyhow::Result<DirPath> {
     let dir = PathBuf::from(input.clone());
-    let config = config().context("failed to load config")?;
-    let search_size = config.cdx_config.search_size.context("search_size is not set")?;
-    let history = History::read(search_size)?;
+    let search_size = config.search_size();
 
-    let found = history.find_by_shortcut(dir)
-        .ok_or(anyhow!("failed to find history by shortcut {}", input))?;
+    let found = history.read(search_size).iter()
+        .map(|entry| DirPath::from_string(&entry.canonical).unwrap())
+        .find(|dir_path| dir_path.ends_with(&dir))
+        .ok_or(anyhow!("[error] failed to find history by shortcut {}", input))?;
+
     let to_append = Entry::from_special(input, &found)?;
-    history.append(&to_append)?;
+    history.append_last(to_append);
     Ok(found)
 }
 
-fn cd_revision(i: usize) -> anyhow::Result<DirPath> {
-    let config = config()?;
-    let search_size = config.cdx_config.search_size.ok_or(anyhow!("search_size is not set"))?;
-    let history = History::read(search_size)?;
-
-    let found = history.find_by_revision(i)
-        .ok_or(anyhow!("failed to find history by revision {}", i))?;
-    let to_append = Entry::from_special(i.to_string(), &found)?;
-    history.append(&to_append)?;
+fn cd_revision(config: &CdxConfig, history: &mut History, revision: usize) -> anyhow::Result<DirPath> {
+    let revision = revision;
+    let search_size = config.search_size();
+    if revision <= 0 || revision > search_size {
+        bail!("[error] revision {} is out of range. (0 < r <={})", revision, search_size);
+    }
+    let found = history.read(search_size)
+        .get(revision - 1) // input revision starts with 1
+        .map(|entry| DirPath::from_string(&entry.canonical).unwrap())
+        .ok_or(anyhow!("[error] failed to find history by revision {}", revision))?;
+    let to_append = Entry::from_special(revision.to_string(), &found)?;
+    history.append_last(to_append);
     Ok(found)
 }
 
-fn cd_interactive() -> anyhow::Result<DirPath> {
-    todo!()
+fn cd_interactive(config: &CdxConfig, history: &mut History) -> anyhow::Result<DirPath> {
+    let search_size = config.search_size();
+    let entries = history.read(search_size);
+
+    let selections = entries.prettify();
+    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Pick a directory")
+        .default(0)
+        .items(selections.as_slice())
+        .interact()?;
+
+    let selected_entry = entries[selection];
+    let selected_dir = DirPath::from_string(&selected_entry.canonical)?;
+    let to_append = Entry::from_special("(selected)".to_string(), &selected_dir)?;
+
+    history.append_last(to_append);
+    Ok(selected_dir)
 }

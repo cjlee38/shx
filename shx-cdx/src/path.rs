@@ -13,10 +13,10 @@ impl DirPath {
 
     pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         if !path.exists() {
-            return bail!("Path {} does not exist", path.display());
+            bail!("Path {} does not exist", path.display());
         }
         if !path.is_dir() {
-            return bail!("Path {} is not a directory", path.display());
+            bail!("Path {} is not a directory", path.display());
         }
         Ok(Self(path))
     }

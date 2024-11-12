@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use crate::cdx::CdxConfig;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub cdx_config: CdxConfig,
@@ -14,31 +15,6 @@ impl Default for Config {
         Config {
             cdx_config: CdxConfig::default(),
         }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CdxConfig {
-    search_size: Option<usize>,
-    max_size: Option<usize>,
-}
-
-impl Default for CdxConfig {
-    fn default() -> Self {
-        CdxConfig {
-            search_size: Some(30),
-            max_size: Some(1024),
-        }
-    }
-}
-
-impl CdxConfig {
-    pub fn search_size(&self) -> usize {
-        self.search_size.unwrap_or(30)
-    }
-
-    pub fn max_size(&self) -> usize {
-        self.max_size.unwrap_or(1024)
     }
 }
 

@@ -1,38 +1,20 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
-use anyhow::{bail, Context};
+/// Represents a directory path, which is guaranteed to be a canonicalized directory.
+pub struct CanonicalPath(PathBuf);
 
-/// Represents a directory path, which must exist and be a directory.
-pub struct DirPath(pub PathBuf);
-
-impl DirPath {
+impl CanonicalPath {
     pub fn from_string(path: &String) -> anyhow::Result<Self> {
         Self::from_path(PathBuf::from(path))
     }
 
     pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
-        if !path.exists() {
-            bail!("Path {} does not exist", path.display());
-        }
-        if !path.is_dir() {
-            bail!("Path {} is not a directory", path.display());
-        }
-        Ok(Self(path))
-    }
-
-    pub fn canonicalize(&self) -> anyhow::Result<Self> {
-        let canonical = self.0.canonicalize()
-            .context(format!("failed to canonicalize path {}", self.0.display()))?;
-        return Ok(Self::from_path(canonical)?);
-    }
-
-    pub fn ends_with(&self, path_buf: &PathBuf) -> bool {
-        self.0.ends_with(&path_buf)
+        Ok(Self(path.canonicalize()?))
     }
 }
 
-impl Display for DirPath {
+impl Display for CanonicalPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.display())
     }

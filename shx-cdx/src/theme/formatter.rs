@@ -1,6 +1,5 @@
 use std::fmt::{Debug, Display};
-use std::iter::{Enumerate, Map};
-use std::slice::Iter;
+
 use colored::Colorize;
 
 use crate::history::Entry;
@@ -12,9 +11,8 @@ pub trait ToPretty {
 }
 
 
-impl ToPretty for Entry  {
+impl ToPretty for Entry {
     fn prettify(&self, index: usize, theme: &Theme) -> StyledEntry {
-
         let index = StyledBridge::new(index, theme.index());
         let canonical = StyledBridge::new(self.canonical.clone(), theme.canonical());
         let raw = StyledBridge::new(self.raw.clone(), theme.raw());

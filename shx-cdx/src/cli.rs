@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use clap::{Args, Parser};
 
+use crate::opts::Opts;
+
 #[derive(Debug, Parser)]
 pub struct Cli {
     #[arg(
@@ -9,6 +11,7 @@ pub struct Cli {
         help = "Specifies the directory to jump.",
         value_parser = clap::value_parser!(DirArgs),
         group = "cd",
+        conflicts_with = "opts"
     )]
     pub dir: Option<DirArgs>,
 
@@ -17,16 +20,32 @@ pub struct Cli {
         long,
         action = clap::ArgAction::SetTrue,
         help = "Show cd history",
-        group = "others",
-        conflicts_with = "cd"
+        group = "opts",
     )]
     pub show_history: bool,
 
+    #[arg(
+        short = 'l',
+        long,
+        help = "Learn",
+        group = "opts",
+    )]
+    pub learn: Option<String>,
 }
 
 impl Cli {
     pub fn dir(&self) -> DirArgs {
         return self.dir.clone().unwrap_or(DirArgs::BulitIn("".to_string()));
+    }
+
+    pub fn opt(&self) -> Option<Opts> {
+        if self.show_history {
+            Some(Opts::ShowHistory)
+        } else if let Some(learn) = &self.learn {
+            Some(Opts::Learn(learn.clone()))
+        } else {
+            None
+        }
     }
 }
 

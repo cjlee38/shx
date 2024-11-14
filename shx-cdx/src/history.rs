@@ -1,13 +1,12 @@
 use std::{fs, io};
 use std::fmt::{Debug, Display};
 use std::io::Write;
+use std::path::Path;
 
 use anyhow::Context;
 use bincode::Options;
 use serde::{Deserialize, Serialize};
 use shx_config::config::path_for;
-
-use crate::path::DirPath;
 
 const DB: &str = "cdx.db";
 
@@ -64,17 +63,21 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn from_special(raw: String, canonical: &DirPath) -> anyhow::Result<Self> {
-        Ok(Entry {
-            raw: format!("^{}", raw),
-            canonical: canonical.canonicalize()?.to_string(),
-        })
+    pub fn new<S, P>(raw: S, canonical: P) -> Self
+    where
+        S: Into<String>,
+        P: AsRef<Path>,
+    {
+        Entry {
+            raw: raw.into(),
+            canonical: canonical.as_ref().display().to_string(),
+        }
     }
 
-    pub fn from_dir(dir: &DirPath) -> anyhow::Result<Self> {
-        Ok(Entry {
-            raw: dir.to_string(),
-            canonical: dir.canonicalize()?.to_string(),
-        })
+    pub fn with_raw(&self, raw: String) -> Self {
+        Entry {
+            raw,
+            canonical: self.canonical.clone(),
+        }
     }
 }

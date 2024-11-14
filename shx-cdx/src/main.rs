@@ -6,21 +6,21 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context};
 use clap::{Args, Parser};
-use dialoguer::console::{Style, style};
-use dialoguer::FuzzySelect;
-use dialoguer::theme::ColorfulTheme;
+use clap::builder::TypedValueParser;
+use inquire::Select;
 use shx_config::cdx::CdxConfig;
 use shx_config::config::{config, home};
 
 use crate::cli::{Cli, DirArgs};
-use crate::formatter::ToPretty;
+use theme::formatter::ToPretty;
 use crate::history::{Entry, History};
 use crate::path::DirPath;
+use crate::theme::{SelectTheme, Theme};
 
 mod cli;
 mod history;
 mod path;
-mod formatter;
+
 mod theme;
 
 fn main() -> ExitCode {
@@ -61,9 +61,12 @@ fn exec() -> anyhow::Result<String>
 fn show_history(config: CdxConfig, history: History) -> anyhow::Result<String> {
     let search_size = config.search_size();
 
-    let vec = history.read(search_size)
-        .prettify(true, &ColorfulTheme::default());
-    let output = vec
+    let output = history.read(search_size)
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| entry.prettify(index, &Theme::default()))
+        .map(|it| it.to_string())
+        .collect::<Vec<_>>()
         .join("\n");
     Ok(output)
 }
@@ -117,26 +120,21 @@ fn cd_revision(config: &CdxConfig, history: &mut History, revision: usize) -> an
 
 fn cd_interactive(config: &CdxConfig, history: &mut History) -> anyhow::Result<DirPath> {
     let search_size = config.search_size();
-    let entries = history.read(search_size);
+    let theme = Theme::default();
+    let selections = history.read(search_size)
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| entry.prettify(index, &theme))
+        .collect::<Vec<_>>();
 
-    let selections = entries.prettify(false, &ColorfulTheme::default());
+    let render_config = theme.render_config();
+    let selection = Select::new("Pick a directory to change", selections)
+        .with_help_message("Use arrow keys to navigate, Enter to select")
+        .with_render_config(render_config)
+        .prompt()?;
 
-    let mut theme = ColorfulTheme::default();
-    theme.prompt_suffix = style(">>>".to_string()).for_stderr().red();
-    theme.active_item_style = Style::new().for_stderr();
-    theme.active_item_prefix = theme.active_item_prefix.bright();
-    theme.fuzzy_match_highlight_style = Style::new().for_stderr().bold().red();
-
-    let selection = FuzzySelect::with_theme(&theme)
-        .with_prompt("Pick a directory or you can search")
-        .default(0)
-        .items(selections.as_slice())
-        .interact()?;
-
-    let selected_entry = entries[selection];
-    let selected_dir = DirPath::from_string(&selected_entry.canonical)?;
-    let to_append = Entry::from_special("(selected)".to_string(), &selected_dir)?;
-
-    history.append_last(to_append);
-    Ok(selected_dir)
+    let entry = selection.to_entry();
+    let dir_path = DirPath::from_string(&entry.canonical)?;
+    history.append_last(entry);
+    return Ok(dir_path);
 }

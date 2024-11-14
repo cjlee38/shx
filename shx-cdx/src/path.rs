@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 
 /// Represents a directory path, which must exist and be a directory.
 pub struct DirPath(pub PathBuf);

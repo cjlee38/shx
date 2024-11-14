@@ -33,10 +33,11 @@ impl History {
         };
     }
 
-    pub fn read(&self, size: usize) -> Vec<&Entry> {
+    pub fn read(&self, size: usize) -> Vec<Entry> {
         self.0.iter()
             .rev()
             .take(size)
+            .map(|it| it.clone())
             .collect()
     }
 

@@ -35,7 +35,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn dir(&self) -> DirArgs {
-        return self.dir.clone().unwrap_or(DirArgs::BulitIn("".to_string()));
+        self.dir.clone().unwrap_or(DirArgs::BulitIn("".to_string()))
     }
 
     pub fn opt(&self) -> Option<Opts> {
@@ -53,10 +53,15 @@ impl FromStr for DirArgs {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        match s.strip_prefix("^") {
+        if s.starts_with("\\") {
+            let dir = s.strip_prefix("\\").unwrap().to_string();
+            println!("dir: {}", dir);
+            return Ok(DirArgs::BulitIn(dir));
+        }
+        match s.strip_prefix(":") {
             None => Ok(DirArgs::BulitIn(s.to_string())),
             Some(it) => {
-                return if it.is_empty() {
+                if it.is_empty() {
                     Ok(DirArgs::Interactive)
                 } else if let Ok(revision) = it.parse::<usize>() {
                     Ok(DirArgs::Revision(revision))

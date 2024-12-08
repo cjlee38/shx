@@ -33,7 +33,7 @@
 4. apply the changes by running `source ~/.bashrc` or `source ~/.zshrc`.
 
 ## Features
-Let's say your current directory is foo/bar and you want to navigate to foo/bar/baz. 
+Let's say your current directory is foo/bar, and you want to navigate to foo/bar/baz. 
 
 Here's how cdx can help:
 
@@ -43,8 +43,8 @@ Here's how cdx can help:
 
 ### 2. End matched
 > Requires previously visited directories by `cdx`.
-- `cdx ^baz` navigates as `cd foo/bar/baz`
-- `cdx ^bar/baz` navigates as `cd foo/bar/baz`
+- `cdx :baz` navigates as `cd foo/bar/baz`
+- `cdx :bar/baz` navigates as `cd foo/bar/baz`
 
 ### 3. Revision based
 > Requires previously visited directories by `cdx`.  
@@ -57,12 +57,20 @@ For a history like:
 0 /foo/bar/baz
 ```
 
-- `cdx ^1` to go to `cd foo/bar/baz`
-- `cdx ^2` to go to `cd foo/bar`
-- `cdx ^3` to go to `cd foo`
+- `cdx :1` to go to `cd foo/bar/baz`
+- `cdx :2` to go to `cd foo/bar`
+- `cdx :3` to go to `cd foo`
 
 ### 4. Interactive selection
 > Requires previously visited directories by `cdx`.
 
-- Run `cdx ^` to start interactive mode.
+- Run `cdx :` to start interactive mode.
 - You can search directories by typing while in interactive mode
+
+## FAQ
+### 1. How to view the navigation history?
+- Run `cdx --show-history` to view the navigation history.
+
+### 2. How can I navigate a directory which starts with `:` ?
+- You can escape the `:` by adding a backslash before it.  
+  e.g. `cdx \\:foo`

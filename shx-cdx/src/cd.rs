@@ -30,7 +30,7 @@ impl CD {
         for entry in history.read(search_size) {
             let p = PathBuf::from(&entry.canonical);
             if p.ends_with(&input_path) {
-                let to_append = entry.with_raw(format!("^{}", input));
+                let to_append = entry.with_raw(format!(":{}", input));
                 history.append_last(to_append);
                 return Ok(p);
             }
@@ -46,7 +46,7 @@ impl CD {
 
         if let Some(entry) = history.read(search_size).get(revision) {
             let p = PathBuf::from(&entry.canonical);
-            let to_append = entry.with_raw(format!("^{}", revision));
+            let to_append = entry.with_raw(format!(":{}", revision));
             history.append_last(to_append);
             return Ok(p);
         }
@@ -70,7 +70,7 @@ impl CD {
             .prompt()?;
 
         let to_append = selection.to_entry()
-            .with_raw("^(selected)".to_string());
+            .with_raw(":(selected)".to_string());
         let p = PathBuf::from(&to_append.canonical);
         history.append_last(to_append);
         return Ok(p);

@@ -42,7 +42,7 @@ fn exec() -> anyhow::Result<String>
 {
     let cli = Cli::parse();
     let mut history = History::open()?;
-    let config = config().unwrap().cdx_config;
+    let config = config()?.cdx_config;
 
     if let Some(opt) = cli.opt() {
         match opt {
